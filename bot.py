@@ -1,6 +1,5 @@
 import os
 import logging
-import requests
 
 from telegram import Update
 from telegram.ext import (
@@ -9,13 +8,18 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from huggingface_hub import InferenceClient
 
 logging.basicConfig(level=logging.INFO)
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 HF_TOKEN = os.environ["HF_TOKEN"]
 
-HF_URL = "https://router.huggingface.co/fal-ai/fal-ai/flux/schnell"
+client = InferenceClient(
+    provider="fal-ai",
+    api_key=HF_TOKEN,
+    timeout=180,
+)
 
 
 async def generate_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -29,25 +33,16 @@ async def generate_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-            "Content-Type": "application/json",
-        }
-
-        response = requests.post(
-            HF_URL,
-            headers=headers,
-            json={"prompt": prompt},
-            timeout=120,
+        image = client.text_to_image(
+            prompt=prompt,
+            model="black-forest-labs/FLUX.1-schnell",
         )
 
-        response.raise_for_status()
-        data = response.json()
-
-        image_url = data["images"][0]["url"]
+        image_path = "/tmp/generated_image.png"
+        image.save(image_path)
 
         await update.message.reply_photo(
-            photo=image_url,
+            photo=open(image_path, "rb"),
             caption="✨ የእርስዎ ፎቶ",
         )
 
